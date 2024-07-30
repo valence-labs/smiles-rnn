@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import sys
-sys.path.append('/mnt/ps/home/CORP/yassir.elmesbahi/project/SMILES-RNN')
+sys.path.append('/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn')
 import argparse
 import logging
 import os

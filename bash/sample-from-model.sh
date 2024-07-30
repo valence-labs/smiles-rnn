@@ -8,8 +8,8 @@
 #SBATCH --mem=50G
 #SBATCH --partition=long
 #SBATCH --time=10:00:00
-#SBATCH --output=/mnt/ps/home/CORP/yassir.elmesbahi/project/SMILES-RNN/out/sample-rnn-smiles.out
-#SBATCH --error=/mnt/ps/home/CORP/yassir.elmesbahi/project/SMILES-RNN/out/sample-rnn-smiles.out     
+#SBATCH --output=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/sample-rnn-smiles.out
+#SBATCH --error=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/sample-rnn-smiles.out     
 
 
 
@@ -47,7 +47,7 @@ export MASTER_PORT=$((((RANDOM<<15)|RANDOM)%60001+5110)) # Port must be 0-65535
 
 ### PATHS
 export HOME_DIR="/mnt/ps/home/CORP/yassir.elmesbahi"
-export PROJ_NAME="SMILES-RNN"
+export PROJ_NAME="smiles-rnn"
 export PROJ_DIR="${HOME_DIR}/project/${PROJ_NAME}"
 export SANDBOX_DIR="${HOME_DIR}/sandbox"
 export DATA_DIR="${HOME_DIR}/ondemand/data/moses"
@@ -92,7 +92,7 @@ export TORCH_LAUNCHER="torchrun \
 "
 
 
-export EPOCH=5
+export EPOCH=10
 export MODEL="RNN"
 export DEVICE="gpu"
 export WAIT_TIME=5

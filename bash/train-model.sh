@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=train-rnn-gru-safe-recap
+#SBATCH --job-name=train-rnn-gru-safe-mmpa
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
@@ -8,8 +8,8 @@
 #SBATCH --mem=50G
 #SBATCH --partition=long
 #SBATCH --time=60:00:00
-#SBATCH --output=/mnt/ps/home/CORP/yassir.elmesbahi/project/SMILES-RNN/out/train-rnn-gru-safe-recap.out
-#SBATCH --error=/mnt/ps/home/CORP/yassir.elmesbahi/project/SMILES-RNN/out/train-rnn-gru-safe-recap.out     
+#SBATCH --output=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/train-rnn-gru-safe-mmpa.out
+#SBATCH --error=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/train-rnn-gru-safe-mmpa.out     
 
 #export MODEL="Transformer"
 #export MODEL="GTr"
@@ -25,7 +25,7 @@ export SUBGRAMMAR="safe-hr"
 export SUBGRAMMAR="safe-rotatable"
 export SUBGRAMMAR="safe-brics"
 export SUBGRAMMAR="safe-recap"
-#export SUBGRAMMAR="safe-mmpa"
+export SUBGRAMMAR="safe-mmpa"
 export SLICER="${SUBGRAMMAR#*-}"
 
 
@@ -63,7 +63,7 @@ export MASTER_PORT=$((((RANDOM<<15)|RANDOM)%60001+5110)) # Port must be 0-65535
 
 ### PATHS
 export HOME_DIR="/mnt/ps/home/CORP/yassir.elmesbahi"
-export PROJ_NAME="SMILES-RNN"
+export PROJ_NAME="smiles-rnn"
 export PROJ_DIR="${HOME_DIR}/project/${PROJ_NAME}"
 export SANDBOX_DIR="${HOME_DIR}/sandbox"
 export DATA_DIR="${HOME_DIR}/ondemand/data/moses"
@@ -131,8 +131,6 @@ export VALID_SMILES="${DATA_DIR}/${SUBGRAMMAR}-valid.smi"
 export TEST_SMILES="${DATA_DIR}/${SUBGRAMMAR}-test.smi"
 export OUTPUT_DIR="${SANDBOX_DIR}/models/${ARCHITECTURE}_${SUBGRAMMAR}"
 export SUFFIX=None
-export N_JOBS=16
-export SMIZIP_NGRAMS=None
 export VALIDATE_FREQUENCY=500
 export N_EPOCHS=10
 export BATCH_SIZE=128
@@ -152,8 +150,6 @@ export RUNNER_ARGS=" \
     --suffix ${SUFFIX} \
     --grammar ${GRAMMAR} \
     --slicer ${SLICER} \
-    --n_jobs ${N_JOBS} \
-    --smizip-ngrams ${SMIZIP_NGRAMS} \
     --valid_smiles ${VALID_SMILES} \
     --test_smiles ${TEST_SMILES} \
     --validate_frequency ${VALIDATE_FREQUENCY} \
@@ -162,8 +158,7 @@ export RUNNER_ARGS=" \
     --device ${DEVICE} \
     ${MODEL} \
 "
-# --randomize \
- 
+
 export PYTHON_LAUNCHER="python \
 "
 

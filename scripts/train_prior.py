@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import sys
-sys.path.append('/mnt/ps/home/CORP/yassir.elmesbahi/project/SMILES-RNN')
+sys.path.append('/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn')
 import argparse
 import json
 import logging
@@ -8,6 +8,7 @@ import multiprocessing
 import os
 import sys
 import time
+import pandas as pd
 from itertools import chain
 from os import path
 
@@ -204,6 +205,7 @@ def main(args):
 
     # Train model
     logger.info("Beginning training")
+    results = {'epoch': [], 'step': [], 'global_step': [], 'sample_loss': [], 'train_loss':  [], 'valid_loss': [], 'test_loss': []}
     global_step = 0
     start_time = time.time()
     for e in range(1, args.n_epochs + 1):
@@ -232,7 +234,7 @@ def main(args):
                     param_group["lr"] *= 1 - 0.03  # Decrease by
 
             # Validate TODO early stopping based on validation NLL
-            if step % args.validate_frequency == 0:
+            if (step % args.validate_frequency == 0) or (e == args.n_epochs):
                 # Validate
                 prior.network.eval()
                 with torch.no_grad():
@@ -241,7 +243,9 @@ def main(args):
                     validity, mols = utils.fraction_valid_smiles(sampled_smiles)
                     writer.add_scalar("All/Validity", validity, global_step)
                     writer.add_scalar(f"Epoch {e}/Validity", validity, step)
-                    
+                    results['epoch'].append(e)
+                    results['step'].append(step)
+                    results['global_step'].append(global_step)
                     if len(mols) > 0:
                         utils.add_mols(
                             writer,
@@ -254,69 +258,80 @@ def main(args):
                     # Check likelihood on other datasets
                     train_dataloader, _ = calculate_nlls_from_model(prior, train_smiles)
                     train_likelihood = next(train_dataloader)
+                    sample_loss = sampled_likelihood.mean()
+                    train_loss = train_likelihood.mean()
                     writer.add_scalars(
                         "All/Train_NLL",
                         {
-                            "sampled": sampled_likelihood.mean(),
-                            "train": train_likelihood.mean(),
+                            "sampled": sample_loss,
+                            "train":train_loss,
                         },
                         global_step,
                     )
                     writer.add_scalars(
                         f"Epoch {e}/Train_NLL",
                         {
-                            "sampled": sampled_likelihood.mean(),
-                            "train": train_likelihood.mean(),
+                            "sampled": sample_loss,
+                            "train": train_loss,
                         },
                         step,
                     )
+                    results['sample_loss'].append(sample_loss)
+                    results['train_loss'].append(train_loss)
+                    
                     if args.valid_smiles is not None:
                         valid_dataloader, _ = calculate_nlls_from_model(
                             prior, valid_smiles
                         )
                         valid_likelihood = next(valid_dataloader)
+                        valid_loss = valid_likelihood.mean()
                         writer.add_scalars(
                             "All/Valid_NLL",
                             {
-                                "sampled": sampled_likelihood.mean(),
-                                "train": train_likelihood.mean(),
-                                "valid": valid_likelihood.mean(),
+                                "sampled": sample_loss,
+                                "train": train_loss,
+                                "valid": valid_loss,
                             },
                             global_step,
                         )
                         writer.add_scalars(
                             f"Epoch {e}/Valid_NLL",
                             {
-                                "sampled": sampled_likelihood.mean(),
-                                "train": train_likelihood.mean(),
-                                "valid": valid_likelihood.mean(),
+                                "sampled": sample_loss,
+                                "train": train_loss,
+                                "valid": valid_loss,
                             },
                             step,
                         )
+                        results['valid_loss'].append(valid_loss)
 
                     if args.test_smiles is not None:
                         test_dataloader, _ = calculate_nlls_from_model(
                             prior, test_smiles
                         )
                         test_likelihood = next(test_dataloader)
+                        test_loss = test_likelihood.mean()
+                        
                         writer.add_scalars(
                             "All/Test_NLL",
                             {
-                                "train": train_likelihood.mean(),
-                                "valid": valid_likelihood.mean(),
-                                "test": test_likelihood.mean(),
+                                "train": train_loss,
+                                "valid": valid_loss,
+                                "test": test_loss,
                             },
                             global_step,
                         )
                         writer.add_scalars(
                             f"Epoch {e}/Test_NLL",
                             {
-                                "train": train_likelihood.mean(),
-                                "valid": valid_likelihood.mean(),
-                                "test": test_likelihood.mean(),
+                                "train": train_loss,
+                                "valid": valid_loss,
+                                "test": test_loss,
                             },
                             step,
                         )
+                        results['test_loss'].append(test_loss)
+                        
                 prior.network.train()
 
         # Save every epoch
@@ -334,6 +349,9 @@ def main(args):
     params.update({"epoch_time_mins": training_time / args.n_epochs})
     with open(os.path.join(args.output_directory, "params.json"), "w") as f:
         json.dump(params, f, indent=2)
+    
+    history = pd.DataFrame.from_dict(results)
+    history.to_csv(os.path.join(args.output_directory, "train_history.csv"))
 
 
 def get_args():
