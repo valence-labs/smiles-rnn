@@ -92,14 +92,43 @@ export TORCH_LAUNCHER="torchrun \
 "
 
 
-export EPOCH=10
+export EPOCH=5
 export MODEL="RNN"
 export DEVICE="gpu"
-export WAIT_TIME=5
+export WAIT_TIME=3
 
+'''
+export MODEL_PATH="${SANDBOX_DIR}/models/original/ChEMBL28pur.ckpt"
+export OUTPUT_DIR="${SANDBOX_DIR}/models/${ARCHITECTURE}_${SUBGRAMMAR}/sampling"
+
+echo "###### Sampling with $MODEL (${CELL_TYPE}) architecture..."
+echo ">>> Using SAFE with $SUBGRAMMAR slicer "
+
+for SEED in 19 33 56 76 99; do
+    echo "===>>> Sampling with seed=$SEED ..."
+    
+    export OUTPUT_FILE="${OUTPUT_DIR}/predictions_${N_SAMPLES}_${SEED}.txt"
+    export RUNNER_ARGS=" \
+        --path ${MODEL_PATH} \
+        --model ${MODEL} \
+        --output ${OUTPUT_FILE} \
+        --device ${DEVICE} \
+        --number ${N_SAMPLES} \
+        --temperature ${TEMPERATURE} \
+        --seed ${SEED} \
+        --native \
+    "
+    export CMD="${PYTHON_LAUNCHER} ${RUNNER} ${RUNNER_ARGS}"
+    echo "===>>> Running command ${CMD}"
+    $CMD
+    echo ">> Waiting ${WAIT_TIME} seconds..."
+    sleep $WAIT_TIME
+done
+
+'''
 
 for CELL_TYPE in 'gru' 'lstm'; do
-    for SUBGRAMMAR in  'safe-hr' 'safe-rotatable' 'safe-brics' 'safe-recap' 'safe-mmpa'; do
+    for SUBGRAMMAR in  'safe-hr' 'safe-rotatable' 'safe-brics' 'safe-recap' 'safe-mmpa' 'smiles'; do
         export ARCHITECTURE="${MODEL}_${CELL_TYPE}"
         export MODEL_PATH="${SANDBOX_DIR}/models/${ARCHITECTURE}_${SUBGRAMMAR}/Prior_None_Epoch-${EPOCH}.ckpt"
         export OUTPUT_DIR="${SANDBOX_DIR}/models/${ARCHITECTURE}_${SUBGRAMMAR}/sampling"

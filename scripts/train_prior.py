@@ -83,6 +83,8 @@ def main(args):
             train_smiles = [smi for smi in train_smiles if smi is not None]
         train_smiles = list(chain.from_iterable(train_smiles))
         logger.info(f"Returned {len(train_smiles)} randomized training smiles")
+    else:
+        logger.info(f"Loaded {len(train_smiles)} training smiles")
     # Load other smiles
     all_smiles = train_smiles
     if args.valid_smiles is not None:
