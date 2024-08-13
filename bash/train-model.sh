@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=train-rnn-gru-safe-brics
+#SBATCH --job-name=train-rnn-gru-safe-mmpa
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
@@ -7,9 +7,9 @@
 #SBATCH --gpus-per-task=H100:1
 #SBATCH --mem=50G
 #SBATCH --partition=long
-#SBATCH --time=60:00:00
-#SBATCH --output=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/train-rnn-gru-safe-brics.out
-#SBATCH --error=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/train-rnn-gru-safe-brics.out     
+#SBATCH --time=24:00:00
+#SBATCH --output=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/train-rnn-gru-safe-mmpa.out
+#SBATCH --error=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/train-rnn-gru-safe-mmpa.out     
 
 #export MODEL="Transformer"
 #export MODEL="GTr"
@@ -18,14 +18,14 @@ export MODEL="RNN"
 export CELL_TYPE="gru"
 export ARCHITECTURE="${MODEL}_${CELL_TYPE}"
 
-export GRAMMAR="SMILES"
-export SUBGRAMMAR="smiles"
+#xport GRAMMAR="SMILES"
+#export SUBGRAMMAR="smiles"
 export GRAMMAR="SAFE"
-#export SUBGRAMMAR="safe-hr"
-#export SUBGRAMMAR="safe-rotatable"
+export SUBGRAMMAR="safe-hr"
+export SUBGRAMMAR="safe-rotatable"
 export SUBGRAMMAR="safe-brics"
-#export SUBGRAMMAR="safe-recap"
-#export SUBGRAMMAR="safe-mmpa"
+export SUBGRAMMAR="safe-recap"
+export SUBGRAMMAR="safe-mmpa"
 export SLICER="${SUBGRAMMAR#*-}"
 
 
@@ -50,7 +50,7 @@ export MASTER_PORT=$((((RANDOM<<15)|RANDOM)%60001+5110)) # Port must be 0-65535
 #export NCCL_DEBUG=INFO
 #export TORCH_CPP_LOG_LEVEL=INFO 
 #export TORCH_DISTRIBUTED_DEBUG=INFO
-#export NCCL_P2P_DISABLE=1ß
+#export NCCL_P2P_DISABLE=1
 #export TORCH_SHOW_CPP_STACKTRACES=1
 #export TORCH_LOGS="+dynamo"
 #export TORCHDYNAMO_VERBOSE=1
@@ -80,9 +80,8 @@ export RUNNER="${PROJ_DIR}/scripts/train_prior.py"
 ### RNN PARAMETERS
 export LAYER_SIZE=512
 export NUM_LAYERS=3
-#export EMB_LAYER_SIZE=256
-export EMB_LAYER_SIZE=128
-export DROPOUT=0.1
+export EMB_LAYER_SIZE=256
+export DROPOUT=0.0
 export LR=1e-3
 #export LR=5e-4
 export RNN_ARGS=" \
@@ -92,9 +91,8 @@ export RNN_ARGS=" \
     --embedding_layer_size ${EMB_LAYER_SIZE} \
     --dropout ${DROPOUT} \
     --learning_rate ${LR} \
-    --layer_normalization \
 "
-
+'''
 export N_HEAD=8
 export N_DIMS=512
 export FF_DIMS=1024
@@ -124,17 +122,19 @@ export GTR_ARGS=" \
     --dropout ${DROPOUT} \
     --learning_rate ${LR} \
     "
-
+'''
 
 ### TRAINING PARAMETERS
 
 export TRAIN_SMILES="${DATA_DIR}/${SUBGRAMMAR}-train.smi"
 export VALID_SMILES="${DATA_DIR}/${SUBGRAMMAR}-valid.smi"
 export TEST_SMILES="${DATA_DIR}/${SUBGRAMMAR}-test.smi"
+
+
 export OUTPUT_DIR="${SANDBOX_DIR}/models/${ARCHITECTURE}_${SUBGRAMMAR}"
-export SUFFIX=None
-export VALIDATE_FREQUENCY=15133
-export N_EPOCHS=50
+export SUFFIX="Moses"
+export VALIDATE_FREQUENCY=500
+export N_EPOCHS=5
 export BATCH_SIZE=128
 export DEVICE="gpu"
 

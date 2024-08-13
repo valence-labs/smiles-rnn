@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import sys
 sys.path.append('/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn')
+
 import argparse
 import json
 import logging
@@ -243,41 +244,28 @@ def main(args):
                     # Sample new molecules
                     sampled_smiles, sampled_likelihood = prior.sample_smiles()
                     validity, mols = utils.fraction_valid_smiles(sampled_smiles)
-                    writer.add_scalar("All/Validity", validity, global_step)
-                    writer.add_scalar(f"Epoch {e}/Validity", validity, step)
+                    writer.add_scalar("Validity", validity, global_step)
                     results['epoch'].append(e)
-                    results['step'].append(step)
                     results['global_step'].append(global_step)
                     if len(mols) > 0:
                         utils.add_mols(
                             writer,
-                            f"Epoch {e}",
+                            f"Mols",
                             mols[:10],
                             mols_per_row=5,
-                            global_step=step,
+                            global_step=global_step,
                         )
-
                     # Check likelihood on other datasets
                     train_dataloader, _ = calculate_nlls_from_model(prior, train_smiles)
                     train_likelihood = next(train_dataloader)
+                    lr = 0.
+                    for param_group in optimizer.param_groups:
+                        lr = param_group["lr"]
                     sample_loss = sampled_likelihood.mean()
                     train_loss = train_likelihood.mean()
-                    writer.add_scalars(
-                        "All/Train_NLL",
-                        {
-                            "sampled": sample_loss,
-                            "train":train_loss,
-                        },
-                        global_step,
-                    )
-                    writer.add_scalars(
-                        f"Epoch {e}/Train_NLL",
-                        {
-                            "sampled": sample_loss,
-                            "train": train_loss,
-                        },
-                        step,
-                    )
+                    writer.add_scalar('Loss/train', train_loss, global_step)
+                    writer.add_scalar('Sampled', sample_loss, global_step)
+                    writer.add_scalar('Learning rate', lr, global_step)
                     results['sample_loss'].append(sample_loss)
                     results['train_loss'].append(train_loss)
                     
@@ -287,24 +275,7 @@ def main(args):
                         )
                         valid_likelihood = next(valid_dataloader)
                         valid_loss = valid_likelihood.mean()
-                        writer.add_scalars(
-                            "All/Valid_NLL",
-                            {
-                                "sampled": sample_loss,
-                                "train": train_loss,
-                                "valid": valid_loss,
-                            },
-                            global_step,
-                        )
-                        writer.add_scalars(
-                            f"Epoch {e}/Valid_NLL",
-                            {
-                                "sampled": sample_loss,
-                                "train": train_loss,
-                                "valid": valid_loss,
-                            },
-                            step,
-                        )
+                        writer.add_scalar('Loss/valid', valid_loss, global_step)
                         results['valid_loss'].append(valid_loss)
 
                     if args.test_smiles is not None:
@@ -313,27 +284,8 @@ def main(args):
                         )
                         test_likelihood = next(test_dataloader)
                         test_loss = test_likelihood.mean()
-                        
-                        writer.add_scalars(
-                            "All/Test_NLL",
-                            {
-                                "train": train_loss,
-                                "valid": valid_loss,
-                                "test": test_loss,
-                            },
-                            global_step,
-                        )
-                        writer.add_scalars(
-                            f"Epoch {e}/Test_NLL",
-                            {
-                                "train": train_loss,
-                                "valid": valid_loss,
-                                "test": test_loss,
-                            },
-                            step,
-                        )
+                        writer.add_scalar('Loss/test', test_loss, global_step)
                         results['test_loss'].append(test_loss)
-                        
                 prior.network.train()
 
         # Save every epoch

@@ -92,7 +92,7 @@ export TORCH_LAUNCHER="torchrun \
 "
 
 
-export EPOCH=5
+export EPOCH=40
 export MODEL="RNN"
 export DEVICE="gpu"
 export WAIT_TIME=3
@@ -127,8 +127,9 @@ done
 
 '''
 
-for CELL_TYPE in 'gru' 'lstm'; do
-    for SUBGRAMMAR in  'safe-hr' 'safe-rotatable' 'safe-brics' 'safe-recap' 'safe-mmpa' 'smiles'; do
+#for CELL_TYPE in 'gru' 'lstm'; do
+for CELL_TYPE in 'gru'; do
+    for SUBGRAMMAR in 'safe-brics' 'smiles'; do
         export ARCHITECTURE="${MODEL}_${CELL_TYPE}"
         export MODEL_PATH="${SANDBOX_DIR}/models/${ARCHITECTURE}_${SUBGRAMMAR}/Prior_None_Epoch-${EPOCH}.ckpt"
         export OUTPUT_DIR="${SANDBOX_DIR}/models/${ARCHITECTURE}_${SUBGRAMMAR}/sampling"
