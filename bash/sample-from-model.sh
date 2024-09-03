@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=sample-rnn-smiles
+#SBATCH --job-name=sample-rnn-gru-augmented
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
@@ -8,8 +8,8 @@
 #SBATCH --mem=50G
 #SBATCH --partition=long
 #SBATCH --time=10:00:00
-#SBATCH --output=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/sample-rnn-smiles.out
-#SBATCH --error=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/sample-rnn-smiles.out     
+#SBATCH --output=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/sample-rnn-gru-augmented.out
+#SBATCH --error=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/sample-rnn-gru-augmented.out   
 
 
 
@@ -59,103 +59,70 @@ export RUNNER="${PROJ_DIR}/scripts/sample_model.py"
 #source ${HOME_DIR}/miniforge3/etc/profile.d/conda.sh
 #mamba activate dev
 
+declare -A EPOCH_MAP=(
+    ["10000"]="3"
+    ["100000"]="6"
+    ["augmented"]="8"
+    ["full"]="10"
+)
 
 export N_SAMPLES=10000
 export TEMPERATURE=1.
-export GTR_ARGS=" \
-    --n_heads ${N_HEAD} \
-    --n_dims ${N_DIMS} \
-    --ff_dims ${FF_DIMS} \
-    --n_layers ${N_LAYERS} \
-    --dropout ${DROPOUT} \
-    --learning_rate ${LR} \
-    "
-
-
-### EVALUATION PARAMETERS
-
-
-
-
-# --unique ??
 
 export PYTHON_LAUNCHER="python \
 "
 
-export TORCH_LAUNCHER="torchrun \
-    --nproc_per_node $GPUS_PER_NODE \
-    --nnodes $N_NODES \
-    --rdzv_backend static \
-    --rdzv_endpoint $MASTER_ADDR:$MASTER_PORT \
-    --max_restarts 0 \
-    --node_rank $NODE_RANK \
-"
+declare -A NATIVE_MAP=(
+    ['safe-hr']="--native"
+    ['safe-brics']="--native"
+    ['safe-recap']="--native"
+    ['safe-rotatable']="--native"
+    ['safe-mmp']="--native"
+    ['smiles']=
+)
 
 
-export EPOCH=40
 export MODEL="RNN"
+export CELL_TYPE="gru"
 export DEVICE="gpu"
 export WAIT_TIME=3
+export SUFFIX="Moses"
 
-'''
-export MODEL_PATH="${SANDBOX_DIR}/models/original/ChEMBL28pur.ckpt"
-export OUTPUT_DIR="${SANDBOX_DIR}/models/${ARCHITECTURE}_${SUBGRAMMAR}/sampling"
 
-echo "###### Sampling with $MODEL (${CELL_TYPE}) architecture..."
-echo ">>> Using SAFE with $SUBGRAMMAR slicer "
+for SUBGRAMMAR in 'safe-hr' 'safe-brics' 'safe-recap' 'safe-rotatable' 'safe-mmpa' ; do
+    #for TYPE in '10000' '100000'; do
+    TYPE='augmented'
+    export EPOCH=${EPOCH_MAP[$TYPE]}
 
-for SEED in 19 33 56 76 99; do
-    echo "===>>> Sampling with seed=$SEED ..."
+    export ARCHITECTURE="${MODEL}_${CELL_TYPE}"
+    export PREFIX="${SANDBOX_DIR}/models/${ARCHITECTURE}_${SUBGRAMMAR}_${TYPE}"
+    export MODEL_PATH="${PREFIX}/Prior_${SUFFIX}_Epoch-${EPOCH}.ckpt"
+    export OUTPUT_DIR="${PREFIX}/sampling"
     
-    export OUTPUT_FILE="${OUTPUT_DIR}/predictions_${N_SAMPLES}_${SEED}.txt"
-    export RUNNER_ARGS=" \
-        --path ${MODEL_PATH} \
-        --model ${MODEL} \
-        --output ${OUTPUT_FILE} \
-        --device ${DEVICE} \
-        --number ${N_SAMPLES} \
-        --temperature ${TEMPERATURE} \
-        --seed ${SEED} \
-        --native \
-    "
-    export CMD="${PYTHON_LAUNCHER} ${RUNNER} ${RUNNER_ARGS}"
-    echo "===>>> Running command ${CMD}"
-    $CMD
-    echo ">> Waiting ${WAIT_TIME} seconds..."
-    sleep $WAIT_TIME
-done
+    echo "###### Cleaning up folder '${OUTPUT_DIR}'..."
+    rm -rf "${OUTPUT_DIR}/*"
 
-'''
+    echo "###### Sampling with $MODEL (${CELL_TYPE}) architecture..."
+    echo ">>> Using '$SUBGRAMMAR' grammar... "
 
-#for CELL_TYPE in 'gru' 'lstm'; do
-for CELL_TYPE in 'gru'; do
-    for SUBGRAMMAR in 'safe-brics' 'smiles'; do
-        export ARCHITECTURE="${MODEL}_${CELL_TYPE}"
-        export MODEL_PATH="${SANDBOX_DIR}/models/${ARCHITECTURE}_${SUBGRAMMAR}/Prior_None_Epoch-${EPOCH}.ckpt"
-        export OUTPUT_DIR="${SANDBOX_DIR}/models/${ARCHITECTURE}_${SUBGRAMMAR}/sampling"
-
-        echo "###### Sampling with $MODEL (${CELL_TYPE}) architecture..."
-        echo ">>> Using SAFE with '$SUBGRAMMAR' slicer "
-
-        for SEED in 19 33 56 76 99; do
-            echo "===>>> Sampling with seed=$SEED ..."
-            
-            export OUTPUT_FILE="${OUTPUT_DIR}/predictions_${N_SAMPLES}_${SEED}.txt"
-            export RUNNER_ARGS=" \
-                --path ${MODEL_PATH} \
-                --model ${MODEL} \
-                --output ${OUTPUT_FILE} \
-                --device ${DEVICE} \
-                --number ${N_SAMPLES} \
-                --temperature ${TEMPERATURE} \
-                --seed ${SEED} \
-                --native \
-            "
-            export CMD="${PYTHON_LAUNCHER} ${RUNNER} ${RUNNER_ARGS}"
-            echo "===>>> Running command '${CMD}'"
-            $CMD
-            echo ">> Waiting ${WAIT_TIME} seconds..."
-            sleep $WAIT_TIME
-        done
+    for SEED in 19 33 56 76 99; do
+        echo "===>>> Sampling with seed=$SEED ..."
+        
+        export OUTPUT_FILE="${OUTPUT_DIR}/predictions_${N_SAMPLES}_${SEED}.txt"
+        export RUNNER_ARGS=" \
+            --path ${MODEL_PATH} \
+            --model ${MODEL} \
+            --output ${OUTPUT_FILE} \
+            --device ${DEVICE} \
+            --number ${N_SAMPLES} \
+            --temperature ${TEMPERATURE} \
+            --seed ${SEED} \
+            ${NATIVE_MAP[$SUBGRAMMAR]}"
+        export CMD="${PYTHON_LAUNCHER} ${RUNNER} ${RUNNER_ARGS}"
+        echo "===>>> Running command '${CMD}'"
+        $CMD
+        echo ">> Waiting ${WAIT_TIME} seconds..."
+        sleep $WAIT_TIME
     done
+    #done
 done

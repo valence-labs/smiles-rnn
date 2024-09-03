@@ -19,7 +19,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm.auto import tqdm
 
 from smilesrnn import utils
-from smilesrnn.dataset import Dataset, calculate_nlls_from_model
+from smilesrnn.dataset import Dataset, CustomDataset, calculate_nlls_from_model
 from smilesrnn.gated_transformer import Model as StableTransformerModel
 from smilesrnn.rnn import Model as RNNModel
 from smilesrnn.transformer import Model as TransformerModel
@@ -28,6 +28,7 @@ from smilesrnn.vocabulary import (
     AISTokenizer,
     DeepSMILESTokenizer,
     SAFETokenizer,
+    SAFETokenizerAug,
     SELFIESTokenizer,
     SMILESTokenizer,
     SmiZipTokenizer,
@@ -41,7 +42,7 @@ logger.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
 logger.addHandler(ch)
-
+    
 
 # ---- Main ----
 def main(args):
@@ -134,11 +135,11 @@ def main(args):
     smiles_vocab = create_vocabulary(smiles_list=all_smiles, tokenizer=tokenizer)
 
     # Create dataset
-    dataset = Dataset(
-        smiles_list=train_smiles, vocabulary=smiles_vocab, tokenizer=tokenizer
+    dataset = CustomDataset(
+        smiles_list=train_smiles, vocabulary=smiles_vocab, tokenizer=SAFETokenizerAug(args.slicer), n_aug=5
     )
     dataloader = torch.utils.data.DataLoader(
-        dataset, batch_size=args.batch_size, shuffle=True, collate_fn=Dataset.collate_fn
+        dataset, batch_size=args.batch_size, shuffle=True, collate_fn=CustomDataset.collate_fn, num_workers=1,
     )
 
     if args.model == "RNN":
@@ -198,10 +199,10 @@ def main(args):
             device=device,
         )
     else:
-        print("Model must be of type [RNN, Transformer, GTr]")
+        logger.error("Model must be of type [RNN, Transformer, GTr]")
         raise KeyError
     
-    print(f"Training {args.model} architecture. Total number of parameters: {sum(p.numel() for p in prior.network.parameters())}")
+    logger.info(f"Training {args.model} architecture. Total number of parameters: {sum(p.numel() for p in prior.network.parameters())}")
 
     # Setup optimizer TODO update to adaptive learning
     optimizer = torch.optim.Adam(prior.network.parameters(), lr=args.learning_rate)
@@ -214,6 +215,7 @@ def main(args):
     for e in range(1, args.n_epochs + 1):
         logger.info(f"Epoch {e}")
         for step, batch in enumerate(tqdm(dataloader, total=len(dataloader))):
+            
             # Update total step
             global_step += 1
 

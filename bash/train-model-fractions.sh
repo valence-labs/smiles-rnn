@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=train-rnn-gru-smiles
+#SBATCH --job-name=train-rnn-gru-safe-recap-100000
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
@@ -7,28 +7,27 @@
 #SBATCH --gpus-per-task=H100:1
 #SBATCH --mem=50G
 #SBATCH --partition=long
-#SBATCH --time=24:00:00
-#SBATCH --output=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/train-rnn-gru-smiles.out
-#SBATCH --error=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/train-rnn-gru-smiles.out     
+#SBATCH --time=24:00:000
+#SBATCH --output=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/train-rnn-gru-safe-recap-100000.out
+#SBATCH --error=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/train-rnn-gru-safe-recap-100000.out
 
-#export MODEL="Transformer"
-#export MODEL="GTr"
+export N_SAMPLES=100000
+
 export MODEL="RNN"
 #export CELL_TYPE="lstm"
 export CELL_TYPE="gru"
 export ARCHITECTURE="${MODEL}_${CELL_TYPE}"
 export DATASET_TYPE="moses"
 
-export GRAMMAR="SMILES"
-export SUBGRAMMAR="smiles"
-#export GRAMMAR="SAFE"
+#export GRAMMAR="SMILES"
+#export SUBGRAMMAR="smiles"
+export GRAMMAR="SAFE"
 #export SUBGRAMMAR="safe-hr"
 #export SUBGRAMMAR="safe-rotatable"
 #export SUBGRAMMAR="safe-brics"
-#export SUBGRAMMAR="safe-recap"
 #export SUBGRAMMAR="safe-mmpa"
+export SUBGRAMMAR="safe-recap"
 export SLICER="${SUBGRAMMAR#*-}"
-
 
 ### GENERAL
 export CUDA_HOME='/cm/shared/apps/cuda12.1/toolkit/12.1.1'
@@ -76,34 +75,40 @@ export RUNNER="${PROJ_DIR}/scripts/train_prior.py"
 #source ${HOME_DIR}/miniforge3/etc/profile.d/conda.sh
 #mamba activate dev
 
+declare -A LR_MAP=(
+    [10000]=1e-3
+    [100000]=1e-3
+)
 
+declare -A EPOCH_MAP=(
+    [10000]=3
+    [100000]=6
+)
 
 ### RNN PARAMETERS
 export LAYER_SIZE=512
 export NUM_LAYERS=3
 export EMB_LAYER_SIZE=256
 export DROPOUT=0.0
-export LR=1e-3
 export RNN_ARGS=" \
     --layer_size ${LAYER_SIZE} \
     --num_layers ${NUM_LAYERS} \
     --cell_type ${CELL_TYPE} \
     --embedding_layer_size ${EMB_LAYER_SIZE} \
     --dropout ${DROPOUT} \
-    --learning_rate ${LR} \
+    --learning_rate ${LR_MAP[$N_SAMPLES]} \
 "
 
 ### TRAINING PARAMETERS
 
-export TRAIN_SMILES="${DATA_DIR}/${DATASET_TYPE}/${SUBGRAMMAR}-train.smi"
-export VALID_SMILES="${DATA_DIR}/${DATASET_TYPE}/${SUBGRAMMAR}-valid.smi"
-export TEST_SMILES="${DATA_DIR}/${DATASET_TYPE}/${SUBGRAMMAR}-test.smi"
+export TRAIN_SMILES="${DATA_DIR}/${DATASET_TYPE}/${SUBGRAMMAR}_${N_SAMPLES}-train.smi"
+export VALID_SMILES="${DATA_DIR}/${DATASET_TYPE}/${SUBGRAMMAR}_${N_SAMPLES}-valid.smi"
+export TEST_SMILES="${DATA_DIR}/${DATASET_TYPE}/${SUBGRAMMAR}_${N_SAMPLES}-test.smi"
 
 
-export OUTPUT_DIR="${SANDBOX_DIR}/models/${ARCHITECTURE}_${SUBGRAMMAR}"
+export OUTPUT_DIR="${SANDBOX_DIR}/models/${ARCHITECTURE}_${SUBGRAMMAR}_${N_SAMPLES}"
 export SUFFIX="Moses"
 export VALIDATE_FREQUENCY=500
-export N_EPOCHS=10
 export BATCH_SIZE=128
 export DEVICE="gpu"
 
@@ -124,7 +129,7 @@ export RUNNER_ARGS=" \
     --valid_smiles ${VALID_SMILES} \
     --test_smiles ${TEST_SMILES} \
     --validate_frequency ${VALIDATE_FREQUENCY} \
-    --n_epochs ${N_EPOCHS} \
+    --n_epochs ${EPOCH_MAP[$N_SAMPLES]} \
     --batch_size ${BATCH_SIZE} \
     --device ${DEVICE} \
     ${MODEL} \

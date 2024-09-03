@@ -4,6 +4,14 @@ Vocabulary helper class from https://github.com/MolecularAI/Reinvent
 
 import copy
 import re
+import math
+import random
+import torch
+
+from multiprocessing import cpu_count, get_context, Pool
+from itertools import permutations
+from functools import partial
+
 
 import numpy as np
 from tqdm import tqdm
@@ -32,6 +40,17 @@ try:
     import safe
 except ImportError:
     safe = None
+
+def parallel_map(func, iterable, cores = None, chunk=None):
+    if cores is None:
+        cores = cpu_count() - 1
+    if chunk is None:
+        chunk = len(iterable) // cores
+    with get_context('fork').Pool(cores) as p:
+        results =  p.map(func, iterable, chunksize=chunk)
+        p.close()
+        p.join()
+    return results
 
 
 # contains the data structure
@@ -80,10 +99,19 @@ class Vocabulary:
 
     def encode(self, tokens):
         """Encodes a list of tokens as vocabulary indexes."""
+        #print(f"$$ tokens == {tokens}")
         vocab_index = np.zeros(len(tokens), dtype=np.float32)
         for i, token in enumerate(tokens):
             vocab_index[i] = self._tokens[token]
+        #print(f"$$ vocab_index == {vocab_index}")
         return vocab_index
+    
+    def batch_encode(self, tokens_list):
+        """Encodes a list of tokens as vocabulary indexes."""
+        #print(f">> tokens list == {tokens_list}")
+        vocab_index_list = [(self.encode(tokens)).astype(np.int64) for tokens in tokens_list]
+        #print(f">> vocab_index_list == {vocab_index_list}")
+        return vocab_index_list
 
     def decode(self, vocab_index):
         """Decodes a vocabulary index matrix to a list of tokens."""
@@ -340,6 +368,86 @@ class AISTokenizer:
                 smi = None
         return smi
 
+def dim(a):
+    if type(a) == torch.Tensor:
+        return list(a.size())
+    elif type(a) in [list, np.ndarray]:
+        return [len(a)] + dim(a[0])
+    else:
+        return []
+
+class SAFETokenizerAug:
+    """Deals with the tokenization and untokenization of SMILES."""
+
+    GRAMMAR = "SAFE"
+
+    def __init__(self, slicer='brics'):
+        if safe is None:
+            raise ModuleNotFoundError(
+                "No module named 'safe'. Install with 'pip install safe-mol'."
+            )
+        self.slicer = slicer
+    """
+    def generate_permutations(self, molecule, n_aug=2):
+        print(f">>> Processing molecule {molecule}")
+        split_mol = molecule.split(".")
+        print(f">>> Splitted molecule == {split_mol}")
+        
+        n = max(1, min(n_aug, math.factorial(len(split_mol))))
+        print(f">>>n={n}, n_aug == {n_aug}, math.factorial(len(split_mol)) == {math.factorial(len(split_mol))}")
+        
+        s = {molecule}
+        while len(s) < n:
+            g = permutations(split_mol)
+            gen_mol = next(g)
+            print(f">>> Generated permuted molecule fragments == {gen_mol}")
+            s.add(".".join(fragments for fragments in gen_mol))
+            random.shuffle(split_mol)
+        return list(s)
+    """
+    def generate_permutations(self, molecule, n_aug=2):
+        s = set()
+        split_mol = np.array(molecule.split("."))
+        for _ in range(n_aug):
+            s.add(".".join(fragments for fragments in np.random.permutation(split_mol)))
+        if len(s) < n_aug:
+            s.add(molecule)
+        return list(s)
+    
+    def tokenize(self, data, with_begin_and_end=True, n_aug=0):
+        """Tokenizes a SMILES string via conversion to atomInSmiles"""
+        data = safe.encode(data, slicer=self.slicer)
+        #print(f"@@@@@@@@@@ Original encoded data == {data}")
+        #print(f"@@@@@@@@@@ Original encoded data size == {dim(data)}")
+        if n_aug is not None or n_aug > 1:
+            data = self.generate_permutations(data, n_aug)
+            #print(f"@@@@@@@@@@ Augmented encoded data size == {dim(data)}")
+        
+        #print(f"@@@@@@@@@@ Augmented encoded data == {data}")
+        tokens = [safe.split(string) for string in data]
+        #print(f"@@@@@@@@@@ Splitted tokens data == {tokens}")
+        #print(f"@@@@@@@@@@ Splitted tokens data size == {dim(tokens)}")
+        if with_begin_and_end:
+            tokens = [["^"] + tokens_list + ["$"] for tokens_list in tokens]
+        #print(f"@@@@@@@@@@ Final tokens data == {tokens}")
+        #print(f"@@@@@@@@@@ Final tokens data size == {dim(tokens)}")
+        return tokens
+
+    def untokenize(self, tokens, convert_to_smiles=True):
+        """Untokenizes an atomInSmiles string followed by conversion to SMILES"""
+        smi = ""
+        for token in tokens:
+            if token == "$":
+                break
+            if token != "^":
+                smi += token
+        if convert_to_smiles:
+            try:
+                smi = safe.decode(smi)
+            except Exception:
+                smi = None
+        return smi
+
 
 class SAFETokenizer:
     """Deals with the tokenization and untokenization of SMILES."""
@@ -352,10 +460,10 @@ class SAFETokenizer:
                 "No module named 'safe'. Install with 'pip install safe-mol'."
             )
         self.slicer = slicer
-
+    
     def tokenize(self, data, with_begin_and_end=True):
         """Tokenizes a SMILES string via conversion to atomInSmiles"""
-        data = safe.encode(data, slicer=self.slicer)
+        data = safe.encode(data, slicer=self.slicer)        
         tokens = safe.split(data)
         if with_begin_and_end:
             tokens = ["^"] + tokens + ["$"]
@@ -375,7 +483,6 @@ class SAFETokenizer:
             except Exception:
                 smi = None
         return smi
-
 
 class SmiZipTokenizer:
     """Deals with the tokenization and untokenization of SmiZipped SMILES."""

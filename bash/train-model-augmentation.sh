@@ -1,34 +1,33 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=train-rnn-gru-smiles
+#SBATCH --job-name=train-rnn-gru-safe-recap-augmentation
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
 #SBATCH --gpus-per-node=H100:1
 #SBATCH --gpus-per-task=H100:1
-#SBATCH --mem=50G
+#SBATCH --mem=100G
 #SBATCH --partition=long
-#SBATCH --time=24:00:00
-#SBATCH --output=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/train-rnn-gru-smiles.out
-#SBATCH --error=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/train-rnn-gru-smiles.out     
+#SBATCH --time=24:00:000
+#SBATCH --output=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/train-rnn-gru-safe-recap-augmentation.out
+#SBATCH --error=/mnt/ps/home/CORP/yassir.elmesbahi/project/smiles-rnn/out/train-rnn-gru-safe-recap-augmentation.out
 
-#export MODEL="Transformer"
-#export MODEL="GTr"
+export N_SAMPLES=100000
+export N_AUG=5
+
 export MODEL="RNN"
 #export CELL_TYPE="lstm"
 export CELL_TYPE="gru"
 export ARCHITECTURE="${MODEL}_${CELL_TYPE}"
 export DATASET_TYPE="moses"
 
-export GRAMMAR="SMILES"
-export SUBGRAMMAR="smiles"
-#export GRAMMAR="SAFE"
+
+export GRAMMAR="SAFE"
 #export SUBGRAMMAR="safe-hr"
 #export SUBGRAMMAR="safe-rotatable"
 #export SUBGRAMMAR="safe-brics"
-#export SUBGRAMMAR="safe-recap"
 #export SUBGRAMMAR="safe-mmpa"
+export SUBGRAMMAR="safe-recap"
 export SLICER="${SUBGRAMMAR#*-}"
-
 
 ### GENERAL
 export CUDA_HOME='/cm/shared/apps/cuda12.1/toolkit/12.1.1'
@@ -69,13 +68,15 @@ export PROJ_DIR="${HOME_DIR}/project/${PROJ_NAME}"
 export SANDBOX_DIR="${HOME_DIR}/sandbox"
 export DATA_DIR="${HOME_DIR}/ondemand/data"
 export HF_HOME="${SANDBOX_DIR}/.hf_home"
-export RUNNER="${PROJ_DIR}/scripts/train_prior.py"
+export RUNNER="${PROJ_DIR}/scripts/train_prior_augmentation.py"
 
 # In a SLURM job, you CANNOT use `conda activate` and instead MUST use:
 #source ${HOME_DIR}/.bashrc
 #source ${HOME_DIR}/miniforge3/etc/profile.d/conda.sh
 #mamba activate dev
 
+export LR=1e-3
+export N_EPOCH=8
 
 
 ### RNN PARAMETERS
@@ -83,7 +84,6 @@ export LAYER_SIZE=512
 export NUM_LAYERS=3
 export EMB_LAYER_SIZE=256
 export DROPOUT=0.0
-export LR=1e-3
 export RNN_ARGS=" \
     --layer_size ${LAYER_SIZE} \
     --num_layers ${NUM_LAYERS} \
@@ -95,16 +95,15 @@ export RNN_ARGS=" \
 
 ### TRAINING PARAMETERS
 
-export TRAIN_SMILES="${DATA_DIR}/${DATASET_TYPE}/${SUBGRAMMAR}-train.smi"
-export VALID_SMILES="${DATA_DIR}/${DATASET_TYPE}/${SUBGRAMMAR}-valid.smi"
-export TEST_SMILES="${DATA_DIR}/${DATASET_TYPE}/${SUBGRAMMAR}-test.smi"
+export TRAIN_SMILES="${DATA_DIR}/${DATASET_TYPE}/${SUBGRAMMAR}_${N_SAMPLES}-train.smi"
+export VALID_SMILES="${DATA_DIR}/${DATASET_TYPE}/${SUBGRAMMAR}_${N_SAMPLES}-valid.smi"
+export TEST_SMILES="${DATA_DIR}/${DATASET_TYPE}/${SUBGRAMMAR}_${N_SAMPLES}-test.smi"
 
 
-export OUTPUT_DIR="${SANDBOX_DIR}/models/${ARCHITECTURE}_${SUBGRAMMAR}"
+export OUTPUT_DIR="${SANDBOX_DIR}/models/${ARCHITECTURE}_${SUBGRAMMAR}_augmented"
 export SUFFIX="Moses"
 export VALIDATE_FREQUENCY=500
-export N_EPOCHS=10
-export BATCH_SIZE=128
+export BATCH_SIZE=25
 export DEVICE="gpu"
 
 
@@ -124,15 +123,16 @@ export RUNNER_ARGS=" \
     --valid_smiles ${VALID_SMILES} \
     --test_smiles ${TEST_SMILES} \
     --validate_frequency ${VALIDATE_FREQUENCY} \
-    --n_epochs ${N_EPOCHS} \
+    --n_epochs ${N_EPOCH} \
     --batch_size ${BATCH_SIZE} \
     --device ${DEVICE} \
     ${MODEL} \
 "
 
+#export PYTHON_LAUNCHER="python -m trace --trace \
+#"
 export PYTHON_LAUNCHER="python \
 "
-
 export TORCH_LAUNCHER="torchrun \
     --nproc_per_node $GPUS_PER_NODE \
     --nnodes $N_NODES \
